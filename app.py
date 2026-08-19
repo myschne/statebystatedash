@@ -293,13 +293,20 @@ st.markdown(
 )
 
 try:
-    with st.spinner("Connecting to GA4 and Meta…"):
+    with st.spinner("Connecting to GA4…"):
         property_info, pages, trend = load_ga4(start_date, end_date)
-        meta_page, social = load_meta(start_date)
 except Exception as exc:
-    st.error("The dashboard could not load its connected data.")
+    st.error("The dashboard could not load GA4 data.")
     st.exception(exc)
     st.stop()
+
+meta_error = None
+try:
+    meta_page, social = load_meta(start_date)
+except Exception as exc:
+    meta_page = {"name": "Facebook", "followers_count": 0}
+    social = pd.DataFrame(columns=["State", "Published", "Reactions", "Comments", "Shares", "Post", "Engagements"])
+    meta_error = str(exc)
 
 states = aggregate_states(pages)
 total_users = int(pages["activeUsers"].sum()) if not pages.empty else 0
@@ -410,6 +417,8 @@ with state_tab:
 with social_tab:
     st.subheader("Facebook amplification")
     st.markdown("<div class='section-note'>Owned posts identified by State by State language or article links.</div>", unsafe_allow_html=True)
+    if meta_error:
+        st.warning("Facebook data is temporarily unavailable. Refresh the Meta Page access token in Streamlit Secrets to restore this section.")
     s1, s2, s3, s4 = st.columns(4)
     s1.metric("Page followers", fmt_int(meta_page.get("followers_count", 0)))
     s2.metric("State posts found", fmt_int(len(social)))
