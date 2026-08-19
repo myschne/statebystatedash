@@ -613,7 +613,21 @@ with state_tab:
     st.markdown("#### Content performance")
     display_pages = state_pages[["pageTitle", "pagePath", "activeUsers", "screenPageViews", "sessions"]].rename(columns={"pageTitle": "Page", "pagePath": "Path", "activeUsers": "Users", "screenPageViews": "Pageviews", "sessions": "Sessions"})
     display_pages["Path"] = "https://www.advancedmanufacturing.org" + display_pages["Path"]
-    st.dataframe(display_pages, hide_index=True, width="stretch", column_config={"Pageviews": st.column_config.ProgressColumn(min_value=0, max_value=max(1, int(display_pages["Pageviews"].max()))), "Path": st.column_config.LinkColumn(display_text="Open article")})
+    st.dataframe(
+        display_pages,
+        hide_index=True,
+        width="stretch",
+        column_config={
+            "Users": st.column_config.NumberColumn(format="localized"),
+            "Pageviews": st.column_config.ProgressColumn(
+                format="localized",
+                min_value=0,
+                max_value=max(1, int(display_pages["Pageviews"].max())),
+            ),
+            "Sessions": st.column_config.NumberColumn(format="localized"),
+            "Path": st.column_config.LinkColumn(display_text="Open article"),
+        },
+    )
 
 with social_tab:
     st.subheader("Social amplification")
