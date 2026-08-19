@@ -71,14 +71,23 @@ st.markdown(
       [data-testid="stMetric"] { background:rgba(255,255,255,.92); border:1px solid #d8ecec; border-radius:18px; padding:16px 18px; box-shadow:0 8px 24px rgba(7,60,91,.07); }
       [data-testid="stMetricLabel"] { color:#5a7584; font-weight:700; }
       [data-testid="stMetricValue"] { color:var(--navy); font-family:'Manrope'; }
-      [data-testid="stTabs"] button,
-      [data-testid="stTabs"] button p {
-        color:#456474 !important;
+      button[data-baseweb="tab"],
+      button[data-baseweb="tab"] *,
+      [data-testid="stTabs"] [role="tab"],
+      [data-testid="stTabs"] [role="tab"] * {
+        color:#294f63 !important;
+        -webkit-text-fill-color:#294f63 !important;
         opacity:1 !important;
+        visibility:visible !important;
         font-weight:800 !important;
       }
-      [data-testid="stTabs"] button[aria-selected="true"],
-      [data-testid="stTabs"] button[aria-selected="true"] p { color:#0c6287 !important; }
+      button[data-baseweb="tab"][aria-selected="true"],
+      button[data-baseweb="tab"][aria-selected="true"] *,
+      [data-testid="stTabs"] [role="tab"][aria-selected="true"],
+      [data-testid="stTabs"] [role="tab"][aria-selected="true"] * {
+        color:#0c6287 !important;
+        -webkit-text-fill-color:#0c6287 !important;
+      }
       [data-testid="stSlider"] label,
       [data-testid="stSlider"] label p,
       [data-testid="stSlider"] [data-testid="stWidgetLabel"] p {
