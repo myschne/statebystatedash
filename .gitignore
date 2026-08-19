@@ -1,0 +1,18 @@
+# Credentials and local secrets
+metasecret.txt
+client_secret.json
+stable-hologram-*.json
+.streamlit/secrets.toml
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# Temporary data and tooling
+work/
+node_modules/
+.wrangler/
+dist/
+.next/
