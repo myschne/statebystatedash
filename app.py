@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
@@ -136,6 +137,67 @@ def credentials_session() -> AuthorizedSession:
         scopes=scopes,
     )
     return AuthorizedSession(credentials)
+
+
+def gam_session() -> AuthorizedSession:
+    scopes = ["https://www.googleapis.com/auth/admanager.readonly"]
+    if "gam_service_account" in st.secrets:
+        credentials = service_account.Credentials.from_service_account_info(
+            dict(st.secrets["gam_service_account"]), scopes=scopes
+        )
+    else:
+        local_key = Path("GAM/advertizerdashboard-acfc4bf4500d.json")
+        if not local_key.exists():
+            raise RuntimeError("GAM service-account credentials are not configured.")
+        credentials = service_account.Credentials.from_service_account_file(local_key, scopes=scopes)
+    return AuthorizedSession(credentials)
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def load_gam_zeiss() -> tuple[dict[str, Any], pd.DataFrame]:
+    session = gam_session()
+    network_response = session.get("https://admanager.googleapis.com/v1/networks", timeout=30)
+    network_response.raise_for_status()
+    networks = network_response.json().get("networks", [])
+    if not networks:
+        raise RuntimeError("The GAM service account cannot access an Ad Manager network.")
+    network = networks[0]
+    base = f"https://admanager.googleapis.com/v1/networks/{network['networkCode']}"
+    response = session.get(
+        f"{base}/lineItems", params={"filter": "Zeiss", "pageSize": 100}, timeout=30
+    )
+    response.raise_for_status()
+    line_items = response.json().get("lineItems", [])
+    ad_units: dict[str, str] = {}
+    records = []
+    for item in line_items:
+        targeted = item.get("targeting", {}).get("inventoryTargeting", {}).get("targetedAdUnits", [])
+        labels = []
+        for target in targeted:
+            resource = target.get("adUnit", "")
+            if resource and resource not in ad_units:
+                unit_response = session.get(f"https://admanager.googleapis.com/v1/{resource}", timeout=30)
+                unit_response.raise_for_status()
+                unit = unit_response.json()
+                ad_units[resource] = unit.get("displayName", unit.get("adUnitCode", resource))
+            if resource:
+                labels.append(ad_units[resource])
+        stats = item.get("stats", {})
+        impressions = int(stats.get("impressionsDelivered", 0))
+        clicks = int(stats.get("clicksDelivered", 0))
+        records.append({
+            "Line item": item.get("displayName", "").split(" - 2026 - ")[-1],
+            "Order": item.get("orderDisplayName", ""),
+            "Start": pd.to_datetime(item.get("startTime")),
+            "End": pd.to_datetime(item.get("endTime")),
+            "Status": item.get("status", "").replace("_", " ").title(),
+            "Type": item.get("lineItemType", "").title(),
+            "Targeted inventory": ", ".join(labels) or "Not specified",
+            "Impressions": impressions,
+            "Clicks": clicks,
+            "CTR": clicks / impressions if impressions else 0,
+        })
+    return network, pd.DataFrame(records)
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -416,8 +478,8 @@ k3.metric("Sessions", fmt_int(total_sessions))
 k4.metric("Engagement rate", f"{engagement_rate:.1%}")
 k5.metric("States with traffic", f"{state_count} / 50")
 
-overview_tab, state_tab, social_tab, sponsor_tab = st.tabs([
-    "National overview", "State explorer", "Social performance", "Sponsor opportunity"
+overview_tab, state_tab, social_tab, zeiss_tab, sponsor_tab = st.tabs([
+    "National overview", "State explorer", "Social performance", "Zeiss performance", "Sponsor opportunity"
 ])
 
 with overview_tab:
@@ -585,6 +647,82 @@ with social_tab:
             )
         else:
             st.info("No Instagram posts were available in this date range.")
+
+with zeiss_tab:
+    st.subheader("Zeiss display campaign")
+    st.markdown(
+        "<div class='section-note'>Google Ad Manager delivery for the Zeiss campaign targeted to the State of the Industry inventory.</div>",
+        unsafe_allow_html=True,
+    )
+    try:
+        with st.spinner("Loading Zeiss delivery from Google Ad Manager…"):
+            gam_network, zeiss_items = load_gam_zeiss()
+        if zeiss_items.empty:
+            st.info("No Zeiss line items were found in the connected GAM network.")
+        else:
+            impressions = int(zeiss_items["Impressions"].sum())
+            clicks = int(zeiss_items["Clicks"].sum())
+            ctr = clicks / impressions if impressions else 0
+            campaign_start = zeiss_items["Start"].min()
+            campaign_end = zeiss_items["End"].max()
+            z1, z2, z3, z4 = st.columns(4)
+            z1.metric("Delivered impressions", fmt_int(impressions))
+            z2.metric("Ad clicks", fmt_int(clicks))
+            z3.metric("Click-through rate", f"{ctr:.2%}")
+            z4.metric("Line items", fmt_int(len(zeiss_items)))
+
+            st.markdown(
+                f"**Campaign window:** {campaign_start.strftime('%b %d, %Y').replace(' 0', ' ')}–{campaign_end.strftime('%b %d, %Y').replace(' 0', ' ')}  \n"
+                f"**GAM network:** {gam_network.get('displayName', gam_network.get('networkCode', 'Google Ad Manager'))}"
+            )
+            chart = zeiss_items.sort_values("Impressions", ascending=True)
+            fig = px.bar(
+                chart,
+                x="Impressions",
+                y="Line item",
+                orientation="h",
+                text="Impressions",
+                color="CTR",
+                color_continuous_scale=[[0, "#8ccfd2"], [1, "#0c6287"]],
+            )
+            fig.update_traces(
+                texttemplate="%{x:,.0f}",
+                textposition="inside",
+                hovertemplate="%{y}<br>Impressions: %{x:,.0f}<br>CTR: %{marker.color:.2%}<extra></extra>",
+            )
+            fig.update_layout(
+                height=350,
+                margin=dict(l=10, r=20, t=45, b=20),
+                title=dict(text="Delivery by line item", font=dict(color="#073c5b", size=18)),
+                paper_bgcolor="white",
+                plot_bgcolor="white",
+                font=dict(color="#315568"),
+                coloraxis_colorbar=dict(title="CTR", tickformat=".2%"),
+                xaxis=dict(title="Delivered impressions", gridcolor="#e1eeee"),
+                yaxis=dict(title="", automargin=True),
+            )
+            st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
+
+            table = zeiss_items[["Line item", "Targeted inventory", "Status", "Start", "End", "Impressions", "Clicks", "CTR"]]
+            st.markdown("#### Line-item detail")
+            st.dataframe(
+                table,
+                hide_index=True,
+                width="stretch",
+                column_config={
+                    "Start": st.column_config.DatetimeColumn(format="MMM D, YYYY"),
+                    "End": st.column_config.DatetimeColumn(format="MMM D, YYYY"),
+                    "Impressions": st.column_config.NumberColumn(format="localized"),
+                    "Clicks": st.column_config.NumberColumn(format="localized"),
+                    "CTR": st.column_config.NumberColumn(format="%.2%%"),
+                },
+            )
+            st.caption(
+                "Impressions, clicks and CTR are live GAM delivery totals. Viewability is omitted because GAM returned no measured viewable impressions for these line items."
+            )
+    except Exception as exc:
+        st.warning("Zeiss GAM reporting is temporarily unavailable.")
+        st.exception(exc)
 
 with sponsor_tab:
     st.subheader("Build a monthly sponsorship package")
