@@ -102,6 +102,7 @@ st.markdown(
         font-weight:700 !important;
       }
       .section-note { color:#68818e; margin-top:-12px; margin-bottom:14px; }
+      .chart-heading { color:#073c5b; font-family:'Manrope',sans-serif; font-size:1.08rem; font-weight:800; margin:1rem 0 1.1rem; }
       .sponsor-card { background:linear-gradient(145deg,#fff,#eff9f7); border:1px solid #d5eae7; border-radius:20px; padding:22px; min-height:158px; }
       .sponsor-card .eyebrow { color:#0c7890; font-size:.75rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase; }
       .sponsor-card .big { color:#073c5b; font-family:'Manrope'; font-weight:800; font-size:2rem; margin:.25rem 0; }
@@ -528,7 +529,8 @@ with social_tab:
             engagement_mix = social_chart.melt(id_vars=["Post label", "Post", "Published"], value_vars=["Reactions", "Comments", "Shares"], var_name="Engagement type", value_name="Count")
             fig = px.bar(engagement_mix, x="Count", y="Post label", orientation="h", color="Engagement type", barmode="stack", text_auto=True, color_discrete_map={"Reactions": "#0c6287", "Comments": "#39b8c8", "Shares": "#d6df43"})
             fig.update_traces(textposition="inside", textfont=dict(color="white", size=12), hovertemplate="%{y}<br>%{fullData.name}: %{x}<extra></extra>")
-            fig.update_layout(height=470, margin=dict(l=10, r=20, t=55, b=20), title=dict(text="Top Facebook campaign posts", font=dict(color="#073c5b", size=18)), font=dict(color="#315568", size=13), paper_bgcolor="white", plot_bgcolor="white", legend=dict(orientation="h", y=1.08, title_text="", font=dict(color="#315568")), xaxis=dict(title="Engagements", gridcolor="#e1eeee", rangemode="tozero", tickfont=dict(color="#516f7d"), title_font=dict(color="#315568")), yaxis=dict(title="", automargin=True, tickfont=dict(color="#294f63")))
+            fig.update_layout(height=470, margin=dict(l=10, r=20, t=40, b=20), font=dict(color="#315568", size=13), paper_bgcolor="white", plot_bgcolor="white", legend=dict(orientation="h", y=1.05, title_text="", font=dict(color="#315568")), xaxis=dict(title="Engagements", gridcolor="#e1eeee", rangemode="tozero", tickfont=dict(color="#516f7d"), title_font=dict(color="#315568")), yaxis=dict(title="", automargin=True, tickfont=dict(color="#294f63")))
+            st.markdown("<div class='chart-heading'>Top Facebook campaign posts</div>", unsafe_allow_html=True)
             st.plotly_chart(fig, width="stretch", config={"displayModeBar": False}, key="facebook-engagement-chart")
             st.dataframe(social.sort_values("Engagements", ascending=False), hide_index=True, width="stretch", column_config={"Published": st.column_config.DatetimeColumn(format="MMM D, YYYY"), "Post": st.column_config.LinkColumn(display_text="View on Facebook")})
         else:
@@ -543,9 +545,31 @@ with social_tab:
             ig_mix = ig_mix[ig_mix["Count"] > 0]
             fig = px.bar(ig_mix, x="Count", y="Post label", orientation="h", color="Engagement type", barmode="stack", text_auto=True, color_discrete_map={"Likes": "#0c6287", "Comments": "#39b8c8", "Saves": "#d6df43", "Shares": "#f3a34a"})
             fig.update_traces(textposition="inside", textfont=dict(color="white", size=12), hovertemplate="%{y}<br>%{fullData.name}: %{x}<extra></extra>")
-            fig.update_layout(height=500, margin=dict(l=10, r=20, t=55, b=20), title=dict(text="Top Instagram posts by engagement mix", font=dict(color="#073c5b", size=18)), font=dict(color="#315568", size=13), paper_bgcolor="white", plot_bgcolor="white", legend=dict(orientation="h", y=1.08, title_text="", font=dict(color="#315568")), xaxis=dict(title="Engagements", gridcolor="#e1eeee", rangemode="tozero", tickfont=dict(color="#516f7d"), title_font=dict(color="#315568")), yaxis=dict(title="", automargin=True, tickfont=dict(color="#294f63")))
+            fig.update_layout(height=500, margin=dict(l=10, r=20, t=40, b=20), font=dict(color="#315568", size=13), paper_bgcolor="white", plot_bgcolor="white", legend=dict(orientation="h", y=1.05, title_text="", font=dict(color="#315568")), xaxis=dict(title="Engagements", gridcolor="#e1eeee", rangemode="tozero", tickfont=dict(color="#516f7d"), title_font=dict(color="#315568")), yaxis=dict(title="", automargin=True, tickfont=dict(color="#294f63")))
+            st.markdown("<div class='chart-heading'>Top Instagram posts by engagement mix</div>", unsafe_allow_html=True)
             st.plotly_chart(fig, width="stretch", config={"displayModeBar": False}, key="instagram-engagement-chart")
-            st.dataframe(instagram_social.sort_values("Engagements", ascending=False), hide_index=True, width="stretch", column_config={"Campaign": st.column_config.CheckboxColumn("State by State"), "Published": st.column_config.DatetimeColumn(format="MMM D, YYYY"), "Post": st.column_config.LinkColumn(display_text="View on Instagram")})
+            instagram_table = instagram_social.sort_values("Engagements", ascending=False).copy()
+            instagram_table["Campaign"] = instagram_table.apply(
+                lambda row: row["State"] if row["Campaign"] and row["State"] != "—" else ("State by State" if row["Campaign"] else "Other content"),
+                axis=1,
+            )
+            instagram_table = instagram_table[["Published", "Type", "Campaign", "Views", "Reach", "Likes", "Comments", "Saves", "Shares", "Engagements", "Post"]]
+            st.dataframe(
+                instagram_table,
+                hide_index=True,
+                width="stretch",
+                column_config={
+                    "Published": st.column_config.DatetimeColumn(format="MMM D, YYYY"),
+                    "Views": st.column_config.NumberColumn(format="localized"),
+                    "Reach": st.column_config.NumberColumn(format="localized"),
+                    "Likes": st.column_config.NumberColumn(format="localized"),
+                    "Comments": st.column_config.NumberColumn(format="localized"),
+                    "Saves": st.column_config.NumberColumn(format="localized"),
+                    "Shares": st.column_config.NumberColumn(format="localized"),
+                    "Engagements": st.column_config.NumberColumn(format="localized"),
+                    "Post": st.column_config.LinkColumn(display_text="Open post"),
+                },
+            )
         else:
             st.info("No Instagram posts were available in this date range.")
 
