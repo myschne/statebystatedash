@@ -628,7 +628,22 @@ with overview_tab:
 
 with state_tab:
     available_states = states[states["State"].isin(STATE_ABBR)].sort_values("State")["State"].tolist()
-    selected_state = st.selectbox("Select a state to explore", available_states, index=available_states.index("Georgia") if "Georgia" in available_states else 0)
+    with st.container(border=True):
+        st.markdown("#### State selector")
+        selector_col, helper_col = st.columns([1.35, 1])
+        with selector_col:
+            selected_state = st.selectbox(
+                "Choose a state",
+                available_states,
+                index=available_states.index("Georgia") if "Georgia" in available_states else 0,
+            )
+        with helper_col:
+            st.markdown(
+                "<div style='padding-top:1.9rem;color:#587480;font-weight:600;'>"
+                "Select a state from the dropdown to update every metric and article below."
+                "</div>",
+                unsafe_allow_html=True,
+            )
     state_row = states[states["State"] == selected_state].iloc[0]
     state_pages = pages[pages["State"] == selected_state].sort_values("screenPageViews", ascending=False)
     st.subheader(f"{selected_state} manufacturing audience")
