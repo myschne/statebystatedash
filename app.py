@@ -57,6 +57,21 @@ st.markdown(
       }
       [data-testid="stSidebar"] .stDateInput button { color:#073c5b !important; }
       [data-testid="stSidebar"] .stDateInput svg { fill:#073c5b !important; color:#073c5b !important; }
+      [data-testid="stSidebar"] .stButton button {
+        background:var(--lime) !important;
+        border:1px solid var(--lime) !important;
+        color:var(--navy) !important;
+        font-weight:800 !important;
+      }
+      [data-testid="stSidebar"] .stButton button * {
+        color:var(--navy) !important;
+        -webkit-text-fill-color:var(--navy) !important;
+        opacity:1 !important;
+      }
+      [data-testid="stSidebar"] .stButton button:hover {
+        background:#e4eb62 !important;
+        border-color:#e4eb62 !important;
+      }
       h1,h2,h3 { font-family:'Manrope',sans-serif !important; letter-spacing:-.035em; color:var(--navy); }
       .block-container { padding-top:1.5rem; max-width:1500px; }
       .hero { background:radial-gradient(circle at 85% 10%,rgba(214,223,67,.85),transparent 19%),linear-gradient(125deg,#073c5b,#08718d); color:white; border-radius:26px; padding:34px 38px 30px; box-shadow:0 22px 60px rgba(7,60,91,.18); margin-bottom:22px; overflow:hidden; position:relative; }
