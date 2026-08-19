@@ -91,6 +91,16 @@ st.markdown(
         opacity:1 !important;
         font-weight:700 !important;
       }
+      [data-testid="stRadio"] label,
+      [data-testid="stRadio"] label *,
+      [data-testid="stRadio"] p,
+      [data-testid="stRadio"] span {
+        color:#294f63 !important;
+        -webkit-text-fill-color:#294f63 !important;
+        opacity:1 !important;
+        visibility:visible !important;
+        font-weight:700 !important;
+      }
       .section-note { color:#68818e; margin-top:-12px; margin-bottom:14px; }
       .sponsor-card { background:linear-gradient(145deg,#fff,#eff9f7); border:1px solid #d5eae7; border-radius:20px; padding:22px; min-height:158px; }
       .sponsor-card .eyebrow { color:#0c7890; font-size:.75rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase; }
@@ -518,19 +528,22 @@ with social_tab:
             engagement_mix = social_chart.melt(id_vars=["Post label", "Post", "Published"], value_vars=["Reactions", "Comments", "Shares"], var_name="Engagement type", value_name="Count")
             fig = px.bar(engagement_mix, x="Count", y="Post label", orientation="h", color="Engagement type", barmode="stack", text_auto=True, color_discrete_map={"Reactions": "#0c6287", "Comments": "#39b8c8", "Shares": "#d6df43"})
             fig.update_traces(textposition="inside", textfont=dict(color="white", size=12), hovertemplate="%{y}<br>%{fullData.name}: %{x}<extra></extra>")
-            fig.update_layout(height=470, margin=dict(l=10, r=20, t=55, b=20), title=dict(text="Top Facebook campaign posts", font=dict(color="#073c5b", size=18)), font=dict(color="#315568", size=13), paper_bgcolor="white", plot_bgcolor="white", legend=dict(orientation="h", y=1.08, title_text=""), xaxis=dict(title="Engagements", gridcolor="#e1eeee", rangemode="tozero"), yaxis=dict(title="", automargin=True))
+            fig.update_layout(height=470, margin=dict(l=10, r=20, t=55, b=20), title=dict(text="Top Facebook campaign posts", font=dict(color="#073c5b", size=18)), font=dict(color="#315568", size=13), paper_bgcolor="white", plot_bgcolor="white", legend=dict(orientation="h", y=1.08, title_text="", font=dict(color="#315568")), xaxis=dict(title="Engagements", gridcolor="#e1eeee", rangemode="tozero", tickfont=dict(color="#516f7d"), title_font=dict(color="#315568")), yaxis=dict(title="", automargin=True, tickfont=dict(color="#294f63")))
             st.plotly_chart(fig, width="stretch", config={"displayModeBar": False}, key="facebook-engagement-chart")
             st.dataframe(social.sort_values("Engagements", ascending=False), hide_index=True, width="stretch", column_config={"Published": st.column_config.DatetimeColumn(format="MMM D, YYYY"), "Post": st.column_config.LinkColumn(display_text="View on Facebook")})
         else:
             st.info("No matching State by State Facebook posts were identified in this date range.")
     else:
         if not instagram_social.empty:
-            ig_chart = instagram_social.nlargest(12, "Engagements").sort_values("Engagements").copy()
+            ig_chart = instagram_social.copy()
+            ig_chart["Mix engagements"] = ig_chart[["Likes", "Comments", "Saves", "Shares"]].sum(axis=1)
+            ig_chart = ig_chart.nlargest(12, "Mix engagements").sort_values("Mix engagements")
             ig_chart["Post label"] = ig_chart.apply(lambda row: f"{row['State'] if row['State'] != '—' else row['Type']} · {row['Published'].strftime('%b')} {row['Published'].day}", axis=1)
             ig_mix = ig_chart.melt(id_vars=["Post label", "Post", "Published"], value_vars=["Likes", "Comments", "Saves", "Shares"], var_name="Engagement type", value_name="Count")
+            ig_mix = ig_mix[ig_mix["Count"] > 0]
             fig = px.bar(ig_mix, x="Count", y="Post label", orientation="h", color="Engagement type", barmode="stack", text_auto=True, color_discrete_map={"Likes": "#0c6287", "Comments": "#39b8c8", "Saves": "#d6df43", "Shares": "#f3a34a"})
             fig.update_traces(textposition="inside", textfont=dict(color="white", size=12), hovertemplate="%{y}<br>%{fullData.name}: %{x}<extra></extra>")
-            fig.update_layout(height=500, margin=dict(l=10, r=20, t=55, b=20), title=dict(text="Top Instagram posts by engagement mix", font=dict(color="#073c5b", size=18)), font=dict(color="#315568", size=13), paper_bgcolor="white", plot_bgcolor="white", legend=dict(orientation="h", y=1.08, title_text=""), xaxis=dict(title="Engagements", gridcolor="#e1eeee", rangemode="tozero"), yaxis=dict(title="", automargin=True))
+            fig.update_layout(height=500, margin=dict(l=10, r=20, t=55, b=20), title=dict(text="Top Instagram posts by engagement mix", font=dict(color="#073c5b", size=18)), font=dict(color="#315568", size=13), paper_bgcolor="white", plot_bgcolor="white", legend=dict(orientation="h", y=1.08, title_text="", font=dict(color="#315568")), xaxis=dict(title="Engagements", gridcolor="#e1eeee", rangemode="tozero", tickfont=dict(color="#516f7d"), title_font=dict(color="#315568")), yaxis=dict(title="", automargin=True, tickfont=dict(color="#294f63")))
             st.plotly_chart(fig, width="stretch", config={"displayModeBar": False}, key="instagram-engagement-chart")
             st.dataframe(instagram_social.sort_values("Engagements", ascending=False), hide_index=True, width="stretch", column_config={"Campaign": st.column_config.CheckboxColumn("State by State"), "Published": st.column_config.DatetimeColumn(format="MMM D, YYYY"), "Post": st.column_config.LinkColumn(display_text="View on Instagram")})
         else:
