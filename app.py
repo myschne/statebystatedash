@@ -101,10 +101,17 @@ def state_from_path(page_path: str) -> str:
 
 
 def credentials_session() -> AuthorizedSession:
-    credentials = service_account.Credentials.from_service_account_file(
-        SERVICE_ACCOUNT_FILE,
-        scopes=["https://www.googleapis.com/auth/analytics.readonly"],
-    )
+    scopes = ["https://www.googleapis.com/auth/analytics.readonly"]
+    if SERVICE_ACCOUNT_FILE.exists():
+        credentials = service_account.Credentials.from_service_account_file(
+            SERVICE_ACCOUNT_FILE,
+            scopes=scopes,
+        )
+    else:
+        credentials = service_account.Credentials.from_service_account_info(
+            dict(st.secrets["gcp_service_account"]),
+            scopes=scopes,
+        )
     return AuthorizedSession(credentials)
 
 
@@ -183,7 +190,11 @@ def meta_get(url: str, token: str) -> dict[str, Any]:
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_meta(start: date) -> tuple[dict[str, Any], pd.DataFrame]:
-    token = META_TOKEN_FILE.read_text(encoding="utf-8").strip()
+    token = (
+        META_TOKEN_FILE.read_text(encoding="utf-8").strip()
+        if META_TOKEN_FILE.exists()
+        else st.secrets["meta"]["page_access_token"]
+    )
     page = meta_get("https://graph.facebook.com/v26.0/me?fields=id,name,followers_count", token)
     url = (
         f"https://graph.facebook.com/v26.0/{page['id']}/published_posts"
