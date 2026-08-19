@@ -287,18 +287,31 @@ def load_instagram(start: date) -> tuple[dict[str, Any], pd.DataFrame]:
         if datetime.fromisoformat(item["timestamp"].replace("Z", "+00:00")) >= cutoff
     ]
 
+    state_names = sorted(STATE_ABBR, key=len, reverse=True)
+    state_media = []
+    for item in media:
+        caption = item.get("caption", "")
+        state = next((name for name in state_names if re.search(rf"\b{re.escape(name)}\b", caption, re.I)), "")
+        campaign = bool(
+            re.search(r"state by state|states-of-the-industry", caption, re.I)
+            or (state and re.search(r"manufactur", caption, re.I))
+        )
+        if campaign:
+            item["_state"] = state
+            state_media.append(item)
+    media = state_media
+
     insight_results: dict[str, dict[str, int]] = {}
     with ThreadPoolExecutor(max_workers=6) as executor:
         futures = {executor.submit(instagram_insights, item["id"], token): item["id"] for item in media}
         for future in as_completed(futures):
             insight_results[futures[future]] = future.result()
 
-    state_names = sorted(STATE_ABBR, key=len, reverse=True)
     records = []
     for item in media:
         caption = item.get("caption", "")
-        state = next((name for name in state_names if re.search(rf"\b{re.escape(name)}\b", caption, re.I)), "")
-        campaign = bool(re.search(r"state by state|states-of-the-industry", caption, re.I))
+        state = item.get("_state", "")
+        campaign = True
         insights = insight_results.get(item["id"], {})
         likes = insights.get("likes", item.get("like_count", 0))
         comments = insights.get("comments", item.get("comments_count", 0))
@@ -517,7 +530,7 @@ with social_tab:
     s1.metric("Facebook followers", fmt_int(meta_page.get("followers_count", 0)))
     s2.metric("Instagram followers", fmt_int(instagram_account.get("followers_count", 0)))
     s3.metric("Facebook campaign posts", fmt_int(len(social)))
-    s4.metric("Instagram posts analyzed", fmt_int(len(instagram_social)))
+    s4.metric("Instagram campaign posts", fmt_int(len(instagram_social)))
     total_social_engagements = (social["Engagements"].sum() if not social.empty else 0) + (instagram_social["Engagements"].sum() if not instagram_social.empty else 0)
     s5.metric("Tracked engagements", fmt_int(total_social_engagements))
 
