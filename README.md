@@ -8,6 +8,7 @@ An internal Streamlit dashboard for SME Media's **State by State of the Manufact
 - State-by-state U.S. traffic map and leaderboard
 - Individual state content explorer
 - Facebook reactions, comments, and shares
+- Instagram views, reach, interactions, likes, comments, saves, and shares
 - Adjustable display inventory, sell-through, and CPM model
 - Live GA4 and Meta connections with hourly caching
 

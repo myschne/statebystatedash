@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
@@ -240,6 +241,76 @@ def load_meta(start: date) -> tuple[dict[str, Any], pd.DataFrame]:
     return page, frame
 
 
+def instagram_insights(media_id: str, token: str) -> dict[str, int]:
+    metrics = "views,reach,total_interactions,likes,comments,saved,shares"
+    try:
+        result = meta_get(
+            f"https://graph.instagram.com/v26.0/{media_id}/insights?metric={metrics}&period=lifetime",
+            token,
+        )
+    except requests.RequestException:
+        return {}
+    values: dict[str, int] = {}
+    for metric in result.get("data", []):
+        value = metric.get("values", [{}])[0].get("value", 0)
+        values[metric.get("name", "")] = int(value) if isinstance(value, (int, float)) else 0
+    return values
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def load_instagram(start: date) -> tuple[dict[str, Any], pd.DataFrame]:
+    token = st.secrets["instagram"]["access_token"].strip().lstrip("\ufeff")
+    account = meta_get(
+        "https://graph.instagram.com/v26.0/me?fields=id,user_id,username,name,account_type,media_count,followers_count",
+        token,
+    )
+    result = meta_get(
+        "https://graph.instagram.com/v26.0/me/media"
+        "?fields=id,caption,media_type,media_product_type,timestamp,permalink,like_count,comments_count"
+        "&limit=50",
+        token,
+    )
+    cutoff = datetime.combine(start, datetime.min.time(), tzinfo=timezone.utc)
+    media = [
+        item for item in result.get("data", [])
+        if datetime.fromisoformat(item["timestamp"].replace("Z", "+00:00")) >= cutoff
+    ]
+
+    insight_results: dict[str, dict[str, int]] = {}
+    with ThreadPoolExecutor(max_workers=6) as executor:
+        futures = {executor.submit(instagram_insights, item["id"], token): item["id"] for item in media}
+        for future in as_completed(futures):
+            insight_results[futures[future]] = future.result()
+
+    state_names = sorted(STATE_ABBR, key=len, reverse=True)
+    records = []
+    for item in media:
+        caption = item.get("caption", "")
+        state = next((name for name in state_names if re.search(rf"\b{re.escape(name)}\b", caption, re.I)), "")
+        campaign = bool(re.search(r"state by state|states-of-the-industry", caption, re.I))
+        insights = insight_results.get(item["id"], {})
+        likes = insights.get("likes", item.get("like_count", 0))
+        comments = insights.get("comments", item.get("comments_count", 0))
+        saves = insights.get("saved", 0)
+        shares = insights.get("shares", 0)
+        interactions = insights.get("total_interactions", likes + comments + saves + shares)
+        records.append({
+            "State": state or ("State by State" if campaign else "—"),
+            "Campaign": campaign,
+            "Published": pd.to_datetime(item["timestamp"]),
+            "Type": item.get("media_product_type") or item.get("media_type", "Post"),
+            "Views": insights.get("views", 0),
+            "Reach": insights.get("reach", 0),
+            "Likes": likes,
+            "Comments": comments,
+            "Saves": saves,
+            "Shares": shares,
+            "Engagements": interactions,
+            "Post": item.get("permalink", ""),
+        })
+    return account, pd.DataFrame(records)
+
+
 def aggregate_states(page_df: pd.DataFrame) -> pd.DataFrame:
     if page_df.empty:
         return pd.DataFrame(columns=["State", "Users", "Pageviews", "Sessions", "Engaged Sessions", "Abbr", "Engagement Rate"])
@@ -293,6 +364,14 @@ except Exception as exc:
     social = pd.DataFrame(columns=["State", "Published", "Reactions", "Comments", "Shares", "Post", "Engagements"])
     meta_error = str(exc)
 
+instagram_error = None
+try:
+    instagram_account, instagram_social = load_instagram(start_date)
+except Exception as exc:
+    instagram_account = {"username": "Instagram", "followers_count": 0, "media_count": 0}
+    instagram_social = pd.DataFrame(columns=["State", "Campaign", "Published", "Type", "Views", "Reach", "Likes", "Comments", "Saves", "Shares", "Engagements", "Post"])
+    instagram_error = str(exc)
+
 states = aggregate_states(pages)
 total_users = int(pages["activeUsers"].sum()) if not pages.empty else 0
 total_views = int(pages["screenPageViews"].sum()) if not pages.empty else 0
@@ -302,7 +381,7 @@ engagement_rate = engaged_sessions / total_sessions if total_sessions else 0
 state_count = int(states["Abbr"].notna().sum()) if not states.empty else 0
 
 st.markdown(
-    f"<div class='small-muted'><span class='status-dot'></span>Live connections · {property_info['name']} · {meta_page.get('name', 'Facebook')} · through {end_date.strftime('%b %d, %Y')}</div>",
+    f"<div class='small-muted'><span class='status-dot'></span>Live connections · {property_info['name']} · {meta_page.get('name', 'Facebook')} · @{instagram_account.get('username', 'Instagram')} · through {end_date.strftime('%b %d, %Y')}</div>",
     unsafe_allow_html=True,
 )
 
@@ -417,54 +496,45 @@ with state_tab:
     st.dataframe(display_pages, hide_index=True, width="stretch", column_config={"Pageviews": st.column_config.ProgressColumn(min_value=0, max_value=max(1, int(display_pages["Pageviews"].max()))), "Path": st.column_config.LinkColumn(display_text="Open article")})
 
 with social_tab:
-    st.subheader("Facebook amplification")
-    st.markdown("<div class='section-note'>Owned posts identified by State by State language or article links.</div>", unsafe_allow_html=True)
+    st.subheader("Social amplification")
+    st.markdown("<div class='section-note'>Connected Facebook and Instagram performance, with State by State campaign posts flagged where identifiable.</div>", unsafe_allow_html=True)
     if meta_error:
         st.warning("Facebook data is temporarily unavailable. Refresh the Meta Page access token in Streamlit Secrets to restore this section.")
-    s1, s2, s3, s4 = st.columns(4)
-    s1.metric("Page followers", fmt_int(meta_page.get("followers_count", 0)))
-    s2.metric("State posts found", fmt_int(len(social)))
-    s3.metric("Total engagements", fmt_int(social["Engagements"].sum() if not social.empty else 0))
-    s4.metric("Top post", fmt_int(social["Engagements"].max() if not social.empty else 0), "engagements")
-    if not social.empty:
-        social_chart = social.nlargest(12, "Engagements").sort_values("Engagements").copy()
-        social_chart["Post label"] = social_chart.apply(
-            lambda row: f"{row['State']} · {row['Published'].strftime('%b')} {row['Published'].day}",
-            axis=1,
-        )
-        engagement_mix = social_chart.melt(
-            id_vars=["Post label", "Post", "Published"],
-            value_vars=["Reactions", "Comments", "Shares"],
-            var_name="Engagement type",
-            value_name="Count",
-        )
-        fig = px.bar(
-            engagement_mix,
-            x="Count",
-            y="Post label",
-            orientation="h",
-            color="Engagement type",
-            barmode="stack",
-            text_auto=True,
-            color_discrete_map={"Reactions": "#0c6287", "Comments": "#39b8c8", "Shares": "#d6df43"},
-            hover_data={"Published": "|%b %d, %Y", "Post": False},
-        )
-        fig.update_traces(textposition="inside", textfont=dict(color="white", size=12), hovertemplate="%{y}<br>%{fullData.name}: %{x}<extra></extra>")
-        fig.update_layout(
-            height=470,
-            margin=dict(l=10, r=20, t=55, b=20),
-            title=dict(text="Top posts by engagement mix", font=dict(color="#073c5b", size=18)),
-            font=dict(color="#315568", size=13),
-            paper_bgcolor="white",
-            plot_bgcolor="white",
-            legend=dict(orientation="h", y=1.08, title_text="", font=dict(color="#315568")),
-            xaxis=dict(title="Engagements", gridcolor="#e1eeee", tickfont=dict(color="#516f7d"), rangemode="tozero"),
-            yaxis=dict(title="", tickfont=dict(color="#294f63", size=12), automargin=True),
-        )
-        st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
-        st.dataframe(social.sort_values("Engagements", ascending=False), hide_index=True, width="stretch", column_config={"Published": st.column_config.DatetimeColumn(format="MMM D, YYYY"), "Post": st.column_config.LinkColumn(display_text="View on Facebook")})
+    if instagram_error:
+        st.warning("Instagram data is temporarily unavailable. Refresh the Instagram access token in Streamlit Secrets to restore this section.")
+    s1, s2, s3, s4, s5 = st.columns(5)
+    s1.metric("Facebook followers", fmt_int(meta_page.get("followers_count", 0)))
+    s2.metric("Instagram followers", fmt_int(instagram_account.get("followers_count", 0)))
+    s3.metric("Facebook campaign posts", fmt_int(len(social)))
+    s4.metric("Instagram posts analyzed", fmt_int(len(instagram_social)))
+    total_social_engagements = (social["Engagements"].sum() if not social.empty else 0) + (instagram_social["Engagements"].sum() if not instagram_social.empty else 0)
+    s5.metric("Tracked engagements", fmt_int(total_social_engagements))
+
+    platform = st.radio("View platform", ["Facebook", "Instagram"], horizontal=True, label_visibility="collapsed")
+    if platform == "Facebook":
+        if not social.empty:
+            social_chart = social.nlargest(12, "Engagements").sort_values("Engagements").copy()
+            social_chart["Post label"] = social_chart.apply(lambda row: f"{row['State']} · {row['Published'].strftime('%b')} {row['Published'].day}", axis=1)
+            engagement_mix = social_chart.melt(id_vars=["Post label", "Post", "Published"], value_vars=["Reactions", "Comments", "Shares"], var_name="Engagement type", value_name="Count")
+            fig = px.bar(engagement_mix, x="Count", y="Post label", orientation="h", color="Engagement type", barmode="stack", text_auto=True, color_discrete_map={"Reactions": "#0c6287", "Comments": "#39b8c8", "Shares": "#d6df43"})
+            fig.update_traces(textposition="inside", textfont=dict(color="white", size=12), hovertemplate="%{y}<br>%{fullData.name}: %{x}<extra></extra>")
+            fig.update_layout(height=470, margin=dict(l=10, r=20, t=55, b=20), title=dict(text="Top Facebook campaign posts", font=dict(color="#073c5b", size=18)), font=dict(color="#315568", size=13), paper_bgcolor="white", plot_bgcolor="white", legend=dict(orientation="h", y=1.08, title_text=""), xaxis=dict(title="Engagements", gridcolor="#e1eeee", rangemode="tozero"), yaxis=dict(title="", automargin=True))
+            st.plotly_chart(fig, width="stretch", config={"displayModeBar": False}, key="facebook-engagement-chart")
+            st.dataframe(social.sort_values("Engagements", ascending=False), hide_index=True, width="stretch", column_config={"Published": st.column_config.DatetimeColumn(format="MMM D, YYYY"), "Post": st.column_config.LinkColumn(display_text="View on Facebook")})
+        else:
+            st.info("No matching State by State Facebook posts were identified in this date range.")
     else:
-        st.info("No matching State by State Facebook posts were identified in this date range.")
+        if not instagram_social.empty:
+            ig_chart = instagram_social.nlargest(12, "Engagements").sort_values("Engagements").copy()
+            ig_chart["Post label"] = ig_chart.apply(lambda row: f"{row['State'] if row['State'] != '—' else row['Type']} · {row['Published'].strftime('%b')} {row['Published'].day}", axis=1)
+            ig_mix = ig_chart.melt(id_vars=["Post label", "Post", "Published"], value_vars=["Likes", "Comments", "Saves", "Shares"], var_name="Engagement type", value_name="Count")
+            fig = px.bar(ig_mix, x="Count", y="Post label", orientation="h", color="Engagement type", barmode="stack", text_auto=True, color_discrete_map={"Likes": "#0c6287", "Comments": "#39b8c8", "Saves": "#d6df43", "Shares": "#f3a34a"})
+            fig.update_traces(textposition="inside", textfont=dict(color="white", size=12), hovertemplate="%{y}<br>%{fullData.name}: %{x}<extra></extra>")
+            fig.update_layout(height=500, margin=dict(l=10, r=20, t=55, b=20), title=dict(text="Top Instagram posts by engagement mix", font=dict(color="#073c5b", size=18)), font=dict(color="#315568", size=13), paper_bgcolor="white", plot_bgcolor="white", legend=dict(orientation="h", y=1.08, title_text=""), xaxis=dict(title="Engagements", gridcolor="#e1eeee", rangemode="tozero"), yaxis=dict(title="", automargin=True))
+            st.plotly_chart(fig, width="stretch", config={"displayModeBar": False}, key="instagram-engagement-chart")
+            st.dataframe(instagram_social.sort_values("Engagements", ascending=False), hide_index=True, width="stretch", column_config={"Campaign": st.column_config.CheckboxColumn("State by State"), "Published": st.column_config.DatetimeColumn(format="MMM D, YYYY"), "Post": st.column_config.LinkColumn(display_text="View on Instagram")})
+        else:
+            st.info("No Instagram posts were available in this date range.")
 
 with sponsor_tab:
     st.subheader("Build a monthly sponsorship package")
