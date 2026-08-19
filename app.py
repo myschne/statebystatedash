@@ -55,8 +55,22 @@ st.markdown(
         color:#073c5b !important;
         -webkit-text-fill-color:#073c5b !important;
       }
-      [data-testid="stSidebar"] .stDateInput button { color:#073c5b !important; }
-      [data-testid="stSidebar"] .stDateInput svg { fill:#073c5b !important; color:#073c5b !important; }
+      [data-testid="stSidebar"] .stDateInput button,
+      [data-testid="stSidebar"] .stDateInput button *,
+      [data-testid="stSidebar"] .stDateInput input,
+      [data-testid="stSidebar"] .stDateInput input *,
+      [data-testid="stSidebar"] .stDateInput [data-baseweb="input"] * {
+        color:#073c5b !important;
+        -webkit-text-fill-color:#073c5b !important;
+        opacity:1 !important;
+      }
+      [data-testid="stSidebar"] .stDateInput svg,
+      [data-testid="stSidebar"] .stDateInput button svg,
+      [data-testid="stSidebar"] .stDateInput button svg * {
+        fill:#073c5b !important;
+        color:#073c5b !important;
+        stroke:#073c5b !important;
+      }
       [data-testid="stSidebar"] .stButton button {
         background:var(--lime) !important;
         border:1px solid var(--lime) !important;
