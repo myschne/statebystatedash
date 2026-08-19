@@ -136,6 +136,33 @@ st.markdown(
         visibility:visible !important;
         font-weight:700 !important;
       }
+      [data-testid="stSelectbox"] label,
+      [data-testid="stSelectbox"] label p {
+        color:#294f63 !important;
+        font-weight:800 !important;
+      }
+      [data-testid="stSelectbox"] [data-baseweb="select"] > div {
+        background:#f4ffff !important;
+        border:2px solid #0c7890 !important;
+        border-radius:12px !important;
+        box-shadow:0 4px 12px rgba(7,60,91,.08) !important;
+        min-height:48px !important;
+        cursor:pointer !important;
+      }
+      [data-testid="stSelectbox"] [data-baseweb="select"] > div:hover {
+        background:#e8f9f8 !important;
+        border-color:#073c5b !important;
+      }
+      [data-testid="stSelectbox"] [data-baseweb="select"] * {
+        color:#073c5b !important;
+        -webkit-text-fill-color:#073c5b !important;
+        font-weight:700 !important;
+        opacity:1 !important;
+      }
+      [data-testid="stSelectbox"] svg {
+        fill:#0c7890 !important;
+        color:#0c7890 !important;
+      }
       .section-note { color:#68818e; margin-top:-12px; margin-bottom:14px; }
       .chart-heading { color:#073c5b; font-family:'Manrope',sans-serif; font-size:1.08rem; font-weight:800; margin:1rem 0 1.1rem; }
       .sponsor-card { background:linear-gradient(145deg,#fff,#eff9f7); border:1px solid #d5eae7; border-radius:20px; padding:22px; min-height:158px; }
@@ -601,7 +628,7 @@ with overview_tab:
 
 with state_tab:
     available_states = states[states["State"].isin(STATE_ABBR)].sort_values("State")["State"].tolist()
-    selected_state = st.selectbox("Choose a state", available_states, index=available_states.index("Georgia") if "Georgia" in available_states else 0)
+    selected_state = st.selectbox("Select a state to explore", available_states, index=available_states.index("Georgia") if "Georgia" in available_states else 0)
     state_row = states[states["State"] == selected_state].iloc[0]
     state_pages = pages[pages["State"] == selected_state].sort_values("screenPageViews", ascending=False)
     st.subheader(f"{selected_state} manufacturing audience")
