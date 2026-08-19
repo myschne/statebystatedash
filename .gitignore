@@ -1,9 +1,7 @@
 # Credentials and local secrets
-metasecret.txt
-client_secret.json
-stable-hologram-*.json
 .streamlit/secrets.toml
 .env
+*secret*.txt
 
 # Python
 __pycache__/

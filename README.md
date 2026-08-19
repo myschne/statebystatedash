@@ -20,12 +20,7 @@ An internal Streamlit dashboard for SME Media's **State by State of the Manufact
    pip install -r requirements.txt
    ```
 
-3. Place the GA4 service-account JSON file and Meta Page token file in the project folder. The default filenames are:
-
-   - `stable-hologram-497015-i9-45282bfa717e.json`
-   - `metasecret.txt`
-
-   Both files are excluded from Git. Never commit credentials.
+3. Copy `.streamlit/secrets.toml.example` to `.streamlit/secrets.toml` and fill in the GA4, Facebook, and Instagram credentials. The real secrets file is excluded from Git. Never commit credentials.
 
 4. Ensure the Google Analytics Admin API and Google Analytics Data API are enabled for the service-account project. Add the service account to the GA4 property with Viewer access.
 
@@ -34,15 +29,5 @@ An internal Streamlit dashboard for SME Media's **State by State of the Manufact
    ```powershell
    streamlit run app.py
    ```
-
-## Optional credential paths
-
-Alternative credential locations can be supplied through environment variables:
-
-```powershell
-$env:GA4_SERVICE_ACCOUNT_FILE = "C:\path\to\service-account.json"
-$env:META_TOKEN_FILE = "C:\path\to\metasecret.txt"
-streamlit run app.py
-```
 
 The Meta Page token needs `pages_show_list`, `pages_read_engagement`, `pages_read_user_content`, and `read_insights`.
