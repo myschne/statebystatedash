@@ -334,7 +334,7 @@ overview_tab, state_tab, social_tab, sponsor_tab = st.tabs([
 
 with overview_tab:
     st.subheader("Audience momentum")
-    st.markdown("<div class='section-note'>Daily readership across the State by State hub and every state article.</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-note'>Monthly readership across the State by State hub and every state article.</div>", unsafe_allow_html=True)
     left, right = st.columns([1.45, 1])
     with left:
         if not trend.empty:
@@ -345,21 +345,21 @@ with overview_tab:
                 .reset_index()
             )
             trend_monthly["Month"] = trend_monthly["date"].dt.strftime("%b %Y")
-            fig = go.Figure()
-            fig.add_trace(go.Bar(
-                x=trend_monthly["Month"],
-                y=trend_monthly["screenPageViews"],
-                name="Pageviews",
-                marker_color="#0c6287",
-                hovertemplate="%{x}<br>Pageviews: %{y:,.0f}<extra></extra>",
-            ))
-            fig.add_trace(go.Bar(
-                x=trend_monthly["Month"],
-                y=trend_monthly["activeUsers"],
-                name="Active users",
-                marker_color="#8ccfd2",
-                hovertemplate="%{x}<br>Active users: %{y:,.0f}<extra></extra>",
-            ))
+            month_order = trend_monthly["Month"].tolist()
+            chart_data = trend_monthly[["Month", "screenPageViews", "activeUsers"]].rename(
+                columns={"screenPageViews": "Pageviews", "activeUsers": "Active users"}
+            ).melt(id_vars="Month", var_name="Metric", value_name="Audience")
+            chart_data["Audience"] = chart_data["Audience"].fillna(0)
+            fig = px.bar(
+                chart_data,
+                x="Month",
+                y="Audience",
+                color="Metric",
+                barmode="group",
+                category_orders={"Month": month_order, "Metric": ["Pageviews", "Active users"]},
+                color_discrete_map={"Pageviews": "#0c6287", "Active users": "#8ccfd2"},
+            )
+            fig.update_traces(hovertemplate="%{x}<br>%{fullData.name}: %{y:,.0f}<extra></extra>")
             fig.update_layout(
                 height=390,
                 margin=dict(l=10, r=15, t=55, b=10),
@@ -373,8 +373,14 @@ with overview_tab:
                 legend=dict(orientation="h", y=1.08, title_text="", font=dict(color="#315568")),
                 xaxis=dict(showgrid=False, tickfont=dict(color="#516f7d"), tickangle=-35, automargin=True),
                 yaxis=dict(title="Audience", gridcolor="#e1eeee", tickfont=dict(color="#516f7d"), rangemode="tozero"),
+                uirevision="monthly-audience-v2",
             )
-            st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
+            st.plotly_chart(
+                fig,
+                width="stretch",
+                config={"displayModeBar": False},
+                key=f"monthly-audience-v2-{start_date}-{end_date}",
+            )
     with right:
         mapped = states.dropna(subset=["Abbr"])
         if not mapped.empty:
