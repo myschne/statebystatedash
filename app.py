@@ -71,8 +71,21 @@ st.markdown(
       [data-testid="stMetric"] { background:rgba(255,255,255,.92); border:1px solid #d8ecec; border-radius:18px; padding:16px 18px; box-shadow:0 8px 24px rgba(7,60,91,.07); }
       [data-testid="stMetricLabel"] { color:#5a7584; font-weight:700; }
       [data-testid="stMetricValue"] { color:var(--navy); font-family:'Manrope'; }
-      [data-testid="stTabs"] button { font-weight:800; color:#456474; }
-      [data-testid="stTabs"] button[aria-selected="true"] { color:var(--blue); }
+      [data-testid="stTabs"] button,
+      [data-testid="stTabs"] button p {
+        color:#456474 !important;
+        opacity:1 !important;
+        font-weight:800 !important;
+      }
+      [data-testid="stTabs"] button[aria-selected="true"],
+      [data-testid="stTabs"] button[aria-selected="true"] p { color:#0c6287 !important; }
+      [data-testid="stSlider"] label,
+      [data-testid="stSlider"] label p,
+      [data-testid="stSlider"] [data-testid="stWidgetLabel"] p {
+        color:#294f63 !important;
+        opacity:1 !important;
+        font-weight:700 !important;
+      }
       .section-note { color:#68818e; margin-top:-12px; margin-bottom:14px; }
       .sponsor-card { background:linear-gradient(145deg,#fff,#eff9f7); border:1px solid #d5eae7; border-radius:20px; padding:22px; min-height:158px; }
       .sponsor-card .eyebrow { color:#0c7890; font-size:.75rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase; }
@@ -363,9 +376,40 @@ with social_tab:
     s3.metric("Total engagements", fmt_int(social["Engagements"].sum() if not social.empty else 0))
     s4.metric("Top post", fmt_int(social["Engagements"].max() if not social.empty else 0), "engagements")
     if not social.empty:
-        social_chart = social.sort_values("Engagements", ascending=True).tail(12)
-        fig = px.bar(social_chart, x="Engagements", y="State", orientation="h", color="Engagements", color_continuous_scale=[[0, "#8dd5d8"], [1, "#073c5b"]], hover_data=["Reactions", "Comments", "Shares"])
-        fig.update_layout(height=420, margin=dict(l=0, r=10, t=10, b=10), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="white", coloraxis_showscale=False, xaxis=dict(gridcolor="#e8f1f1"), yaxis_title="", xaxis_title="Engagements")
+        social_chart = social.nlargest(12, "Engagements").sort_values("Engagements").copy()
+        social_chart["Post label"] = social_chart.apply(
+            lambda row: f"{row['State']} · {row['Published'].strftime('%b')} {row['Published'].day}",
+            axis=1,
+        )
+        engagement_mix = social_chart.melt(
+            id_vars=["Post label", "Post", "Published"],
+            value_vars=["Reactions", "Comments", "Shares"],
+            var_name="Engagement type",
+            value_name="Count",
+        )
+        fig = px.bar(
+            engagement_mix,
+            x="Count",
+            y="Post label",
+            orientation="h",
+            color="Engagement type",
+            barmode="stack",
+            text_auto=True,
+            color_discrete_map={"Reactions": "#0c6287", "Comments": "#39b8c8", "Shares": "#d6df43"},
+            hover_data={"Published": "|%b %d, %Y", "Post": False},
+        )
+        fig.update_traces(textposition="inside", textfont=dict(color="white", size=12), hovertemplate="%{y}<br>%{fullData.name}: %{x}<extra></extra>")
+        fig.update_layout(
+            height=470,
+            margin=dict(l=10, r=20, t=55, b=20),
+            title=dict(text="Top posts by engagement mix", font=dict(color="#073c5b", size=18)),
+            font=dict(color="#315568", size=13),
+            paper_bgcolor="white",
+            plot_bgcolor="white",
+            legend=dict(orientation="h", y=1.08, title_text="", font=dict(color="#315568")),
+            xaxis=dict(title="Engagements", gridcolor="#e1eeee", tickfont=dict(color="#516f7d"), rangemode="tozero"),
+            yaxis=dict(title="", tickfont=dict(color="#294f63", size=12), automargin=True),
+        )
         st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
         st.dataframe(social.sort_values("Engagements", ascending=False), hide_index=True, width="stretch", column_config={"Published": st.column_config.DatetimeColumn(format="MMM D, YYYY"), "Post": st.column_config.LinkColumn(display_text="View on Facebook")})
     else:
