@@ -50,23 +50,28 @@ st.markdown(
       [data-testid="stSidebar"] * { color:white; }
       [data-testid="stSidebar"] [data-baseweb="input"],
       [data-testid="stSidebar"] [data-baseweb="base-input"],
+      [data-testid="stSidebar"] [data-baseweb="input"] input,
+      [data-testid="stSidebar"] [data-baseweb="base-input"] input,
+      [data-testid="stSidebar"] input[type="text"],
       [data-testid="stSidebar"] [data-testid="stDateInput"] input {
         background:#f8ffff !important;
         color:#073c5b !important;
         -webkit-text-fill-color:#073c5b !important;
+        opacity:1 !important;
       }
-      [data-testid="stSidebar"] [data-testid="stDateInput"] button,
-      [data-testid="stSidebar"] [data-testid="stDateInput"] button *,
-      [data-testid="stSidebar"] [data-testid="stDateInput"] input,
-      [data-testid="stSidebar"] [data-testid="stDateInput"] input *,
-      [data-testid="stSidebar"] [data-testid="stDateInput"] [data-baseweb="input"] * {
+      [data-testid="stSidebar"] [data-testid*="DateInput"],
+      [data-testid="stSidebar"] [data-testid*="DateInput"] *,
+      [data-testid="stSidebar"] [data-testid*="dateInput"],
+      [data-testid="stSidebar"] [data-testid*="dateInput"] * {
         color:#073c5b !important;
         -webkit-text-fill-color:#073c5b !important;
         opacity:1 !important;
+        caret-color:#073c5b !important;
       }
-      [data-testid="stSidebar"] [data-testid="stDateInput"] svg,
-      [data-testid="stSidebar"] [data-testid="stDateInput"] button svg,
-      [data-testid="stSidebar"] [data-testid="stDateInput"] button svg * {
+      [data-testid="stSidebar"] [data-testid*="DateInput"] svg,
+      [data-testid="stSidebar"] [data-testid*="DateInput"] svg *,
+      [data-testid="stSidebar"] [data-testid*="dateInput"] svg,
+      [data-testid="stSidebar"] [data-testid*="dateInput"] svg * {
         fill:#073c5b !important;
         color:#073c5b !important;
         stroke:#073c5b !important;
