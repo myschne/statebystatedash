@@ -385,8 +385,19 @@ with overview_tab:
         mapped = states.dropna(subset=["Abbr"])
         if not mapped.empty:
             map_fig = px.choropleth(mapped, locations="Abbr", locationmode="USA-states", color="Pageviews", scope="usa", hover_name="State", hover_data={"Users": ":,.0f", "Pageviews": ":,.0f", "Abbr": False}, color_continuous_scale=[[0, "#dff4f1"], [.5, "#39b8c8"], [1, "#073c5b"]])
-            map_fig.update_layout(height=390, margin=dict(l=0, r=0, t=20, b=0), paper_bgcolor="rgba(0,0,0,0)", coloraxis_colorbar=dict(title="Views", thickness=10))
-            st.plotly_chart(map_fig, width="stretch", config={"displayModeBar": False})
+            map_fig.update_layout(
+                height=390,
+                margin=dict(l=0, r=0, t=20, b=0),
+                paper_bgcolor="rgba(0,0,0,0)",
+                coloraxis_colorbar=dict(title="Views", thickness=10),
+                dragmode=False,
+                geo=dict(scope="usa", projection_type="albers usa"),
+            )
+            st.plotly_chart(
+                map_fig,
+                width="stretch",
+                config={"displayModeBar": False, "scrollZoom": False, "doubleClick": False},
+            )
 
     st.subheader("State leaderboard")
     leaderboard = states[states["State"].isin(STATE_ABBR)].head(15).copy()
