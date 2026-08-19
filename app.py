@@ -331,11 +331,42 @@ with overview_tab:
     left, right = st.columns([1.45, 1])
     with left:
         if not trend.empty:
-            trend_daily = trend.groupby("date", as_index=False)[["activeUsers", "screenPageViews"]].sum()
+            trend_monthly = (
+                trend.set_index("date")[["activeUsers", "screenPageViews"]]
+                .resample("MS")
+                .sum()
+                .reset_index()
+            )
+            trend_monthly["Month"] = trend_monthly["date"].dt.strftime("%b %Y")
             fig = go.Figure()
-            fig.add_trace(go.Scatter(x=trend_daily["date"], y=trend_daily["screenPageViews"], name="Pageviews", mode="lines", line=dict(color="#08718d", width=3), fill="tozeroy", fillcolor="rgba(57,184,200,.12)"))
-            fig.add_trace(go.Scatter(x=trend_daily["date"], y=trend_daily["activeUsers"], name="Users", mode="lines", line=dict(color="#9daa24", width=2)))
-            fig.update_layout(height=390, margin=dict(l=10, r=10, t=20, b=10), plot_bgcolor="white", paper_bgcolor="rgba(0,0,0,0)", hovermode="x unified", legend=dict(orientation="h", y=1.08), xaxis=dict(showgrid=False), yaxis=dict(gridcolor="#e8f1f1"))
+            fig.add_trace(go.Bar(
+                x=trend_monthly["Month"],
+                y=trend_monthly["screenPageViews"],
+                name="Pageviews",
+                marker_color="#0c6287",
+                hovertemplate="%{x}<br>Pageviews: %{y:,.0f}<extra></extra>",
+            ))
+            fig.add_trace(go.Bar(
+                x=trend_monthly["Month"],
+                y=trend_monthly["activeUsers"],
+                name="Active users",
+                marker_color="#8ccfd2",
+                hovertemplate="%{x}<br>Active users: %{y:,.0f}<extra></extra>",
+            ))
+            fig.update_layout(
+                height=390,
+                margin=dict(l=10, r=15, t=55, b=10),
+                title=dict(text="Monthly readership", font=dict(color="#073c5b", size=18)),
+                barmode="group",
+                bargap=.22,
+                font=dict(color="#315568", size=13),
+                plot_bgcolor="white",
+                paper_bgcolor="rgba(0,0,0,0)",
+                hovermode="x unified",
+                legend=dict(orientation="h", y=1.08, title_text="", font=dict(color="#315568")),
+                xaxis=dict(showgrid=False, tickfont=dict(color="#516f7d"), tickangle=-35, automargin=True),
+                yaxis=dict(title="Audience", gridcolor="#e1eeee", tickfont=dict(color="#516f7d"), rangemode="tozero"),
+            )
             st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
     with right:
         mapped = states.dropna(subset=["Abbr"])
